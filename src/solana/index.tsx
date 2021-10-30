@@ -7,6 +7,7 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import { deserialize, serialize } from "borsh";
+import { type } from "os";
 
 const cluster = "https://api/devnet.solana.com";
 const connection = new Connection(cluster, "confirmed");
@@ -41,8 +42,7 @@ export async function signAndSendTransaction(transaction: Transaction) {
 
 class CampaignDetails {
   constructor(properties: any) {
-    Object.keys(properties).forEach((key, i) => {
-      // let intkey = parseInt(key);
+    Object.keys(properties).forEach((key) => {
       this[key] = properties[key];
     });
   }
