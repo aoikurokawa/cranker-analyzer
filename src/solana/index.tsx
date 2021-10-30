@@ -148,3 +148,84 @@ export async function getAllCampaigns() {
   });
   return campaigns;
 }
+
+export async function donateToCampaign(campaignPubKey, amount) {
+  await checkWallet();
+
+  const SEED = "abcdef" + Math.random().toString();
+  let newAccount = await PublicKey.createWithSeed(
+    wallet.publicKey,
+    SEED,
+    programId
+  );
+
+  const createProgramAccount = SystemProgram.createAccountWithSeed({
+    fromPubkey: wallet.publicKey,
+    basePubkey: wallet.publicKey,
+    seed: SEED,
+    newAccountPubkey: newAccount,
+    lamports: amount,
+    space: 1,
+    programId: programId,
+  });
+
+  const instructionToOurProgram = new TransactionInstruction({
+    keys: [
+      { pubkey: campaignPubKey, isSigner: false, isWritable: true },
+      { pubkey: newAccount, isSigner: false, isWritable: true },
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+    ],
+    programId: programId,
+    data: new Uint8Array([2]),
+  });
+
+  const trans = await setPayerAndBlockhashTransaction([
+    createProgramAccount,
+    instructionToOurProgram,
+  ]);
+
+  const signature = await signAndSendTransaction(trans);
+  const result = await connection.confirmTransaction(signature);
+  console.log("end sendMessage", result);
+}
+
+class WithDrawRequest {
+  constructor(properties) {
+    Object.keys(properties).forEach((key) => {
+      this[key] = properties[key];
+    });
+  }
+
+  static schema = new Map([
+    [
+      WithDrawRequest,
+      {
+        kind: "struct",
+        fields: [["amount", "u64"]],
+      },
+    ],
+  ]);
+}
+
+export async function withdraw(campaignPubKey, amount) {
+  await checkWallet();
+  let withdrawRequest = new WithDrawRequest({ amount: amount });
+  let data = serialize(WithDrawRequest.schema, WithDrawRequest);
+  let data_to_send = new Uint8Array([1, ...data]);
+
+  const instructionToOurProgram = new TransactionInstruction({
+    keys: [
+      { pubkey: campaignPubKey, isSigner: false, isWritable: true },
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+    ],
+    programId: programId,
+    data: data_to_send,
+  });
+  const trans = await setPayerAndBlockhashTransaction([
+    instructionToOurProgram,
+  ]);
+  const signature = await signAndSendTransaction(trans);
+  const result = await connection.confirmTransaction(signature);
+
+  console.log("end sendMessage", result);
+}
