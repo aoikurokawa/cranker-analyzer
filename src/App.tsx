@@ -6,12 +6,12 @@ import Form from "./components/Form";
 import { getAllCampaigns } from "./solana";
 
 const App = () => {
-  
+
   const [route, setRoute] = useState(0);
   const [cards, setCards] = useState([]);
 
   useEffect(() => {
-    getAllCampaigns().then((val) => {
+    getAllCampaigns().then((val: any) => {
       setCards(val);
       console.log(val);
     });

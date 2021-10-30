@@ -4,14 +4,14 @@ import { donateToCampaign, getAllCampaigns, withdraw } from "../solana";
 const Card = ({ data, setCards }) => {
   const [amount, setAmount] = useState(0);
 
-  const onDonate = async (e) => {
+  const onDonate = async (e: any) => {
     e.preventDefault();
     await donateToCampaign(data.id, amount);
     let newCards = await getAllCampaigns();
     setCards(newCards);
   };
 
-  const onWithdraw = async (e) => {
+  const onWithdraw = async (e: any) => {
     e.preventDefault();
     try {
       await withdraw(data.id, amount);

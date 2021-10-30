@@ -48,12 +48,19 @@ interface ICmapaignDetails {
   admin: number;
 }
 
-class CampaignDetails extends ICmapaignDetails {
+class CampaignDetails implements ICmapaignDetails {
+
+  name = "";
+  description = "";
+  image_link = "";
+  amount_donated = 0;
+  admin = 1;
+
+
   constructor(properties: any) {
     Object.keys(properties).forEach((key) => {
       this[key] = properties[key];
     });
-    super();
   }
 
   static schema: any = new Map([
