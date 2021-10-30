@@ -41,6 +41,12 @@ export async function signAndSendTransaction(transaction: Transaction) {
 }
 
 class CampaignDetails {
+  name: string;
+  description: string;
+  image_link: string;
+  amount_donated: number;
+  admin
+
   constructor(properties: any) {
     Object.keys(properties).forEach((key) => {
       this[key] = properties[key];
@@ -90,6 +96,7 @@ export async function createCampaign(name, description, image_link) {
 
   let data = serialize(CampaignDetails.schema, campaign);
   let data_to_send = new Uint8Array([0, ...data]);
+  let data_to_send_buffer = new Buffer(data_to_send); 
 
   const lamports = await connection.getMinimumBalanceForRentExemption(
     data.length
@@ -111,7 +118,7 @@ export async function createCampaign(name, description, image_link) {
       { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
     ],
     programId: programId,
-    data: data_to_send,
+    data: data_to_send_buffer,
   });
 
   const trans = await setPayerAndBlockhashTransaction([
@@ -176,7 +183,7 @@ export async function donateToCampaign(campaignPubKey, amount) {
       { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
     ],
     programId: programId,
-    data: new Uint8Array([2]),
+    data: new Buffer(new Uint8Array([2])),
   });
 
   const trans = await setPayerAndBlockhashTransaction([
@@ -212,6 +219,7 @@ export async function withdraw(campaignPubKey, amount) {
   let withdrawRequest = new WithDrawRequest({ amount: amount });
   let data = serialize(WithDrawRequest.schema, WithDrawRequest);
   let data_to_send = new Uint8Array([1, ...data]);
+  let data_to_send_buffer = new Buffer(data_to_send);
 
   const instructionToOurProgram = new TransactionInstruction({
     keys: [
@@ -219,7 +227,7 @@ export async function withdraw(campaignPubKey, amount) {
       { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
     ],
     programId: programId,
-    data: data_to_send,
+    data: data_to_send_buffer,
   });
   const trans = await setPayerAndBlockhashTransaction([
     instructionToOurProgram,
