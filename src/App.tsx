@@ -22,7 +22,7 @@ const App = () => {
       <Header setRoute={setRoute} />
       {route === 0 ? (
         <div>
-          {cards.map((e, idx) => (
+          {cards.map((e) => (
             <Card
               key={e.pubId.toString()}
               data={{
@@ -40,7 +40,7 @@ const App = () => {
         <Form
           setRoute={(e) => {
             setRoute(e);
-            getAllCampaigns().then((val) => {
+            getAllCampaigns().then((val: any) => {
               setCards(val);
             });
           }}
