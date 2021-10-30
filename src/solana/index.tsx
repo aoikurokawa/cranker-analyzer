@@ -40,17 +40,20 @@ export async function signAndSendTransaction(transaction: Transaction) {
   }
 }
 
-class CampaignDetails {
+interface ICmapaignDetails {
   name: string;
   description: string;
   image_link: string;
   amount_donated: number;
-  admin
+  admin: number;
+}
 
+class CampaignDetails extends ICmapaignDetails {
   constructor(properties: any) {
     Object.keys(properties).forEach((key) => {
       this[key] = properties[key];
     });
+    super();
   }
 
   static schema: any = new Map([
@@ -76,12 +79,16 @@ async function checkWallet() {
   }
 }
 
-export async function createCampaign(name, description, image_link) {
+export async function createCampaign(
+  name: string,
+  description: string,
+  image_link: string
+) {
   await checkWallet();
 
   const SEED = "abcdef" + Math.random().toString();
   let newAccout = await PublicKey.createWithSeed(
-    wallet.publicKey,
+    wallet.publicKey!,
     SEED,
     programId
   );
@@ -90,21 +97,21 @@ export async function createCampaign(name, description, image_link) {
     name: name,
     description: description,
     image_link: image_link,
-    admin: wallet.publicKey.toBuffer(),
+    admin: wallet.publicKey!.toBuffer(),
     amount_donated: 0,
   });
 
   let data = serialize(CampaignDetails.schema, campaign);
   let data_to_send = new Uint8Array([0, ...data]);
-  let data_to_send_buffer = new Buffer(data_to_send); 
+  let data_to_send_buffer = new Buffer(data_to_send);
 
   const lamports = await connection.getMinimumBalanceForRentExemption(
     data.length
   );
 
   const createProgramAccount = SystemProgram.createAccountWithSeed({
-    fromPubkey: wallet.publicKey,
-    basePubkey: wallet.publicKey,
+    fromPubkey: wallet.publicKey!,
+    basePubkey: wallet.publicKey!,
     seed: SEED,
     newAccountPubkey: newAccout,
     lamports: lamports,
@@ -115,7 +122,7 @@ export async function createCampaign(name, description, image_link) {
   const instructionToOurProgram = new TransactionInstruction({
     keys: [
       { pubkey: newAccout, isSigner: false, isWritable: true },
-      { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
+      { pubkey: wallet.publicKey!, isSigner: true, isWritable: false },
     ],
     programId: programId,
     data: data_to_send_buffer,
@@ -133,7 +140,7 @@ export async function createCampaign(name, description, image_link) {
 
 export async function getAllCampaigns() {
   let accounts = await connection.getProgramAccounts(programId);
-  let campaigns = [];
+  let campaigns: any[] = [];
   accounts.forEach((e) => {
     try {
       let campData = deserialize(
@@ -156,19 +163,19 @@ export async function getAllCampaigns() {
   return campaigns;
 }
 
-export async function donateToCampaign(campaignPubKey, amount) {
+export async function donateToCampaign(campaignPubKey: any, amount: number) {
   await checkWallet();
 
   const SEED = "abcdef" + Math.random().toString();
   let newAccount = await PublicKey.createWithSeed(
-    wallet.publicKey,
+    wallet.publicKey!,
     SEED,
     programId
   );
 
   const createProgramAccount = SystemProgram.createAccountWithSeed({
-    fromPubkey: wallet.publicKey,
-    basePubkey: wallet.publicKey,
+    fromPubkey: wallet.publicKey!,
+    basePubkey: wallet.publicKey!,
     seed: SEED,
     newAccountPubkey: newAccount,
     lamports: amount,
@@ -180,7 +187,7 @@ export async function donateToCampaign(campaignPubKey, amount) {
     keys: [
       { pubkey: campaignPubKey, isSigner: false, isWritable: true },
       { pubkey: newAccount, isSigner: false, isWritable: true },
-      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+      { pubkey: wallet.publicKey!, isSigner: true, isWritable: true },
     ],
     programId: programId,
     data: new Buffer(new Uint8Array([2])),
@@ -197,7 +204,7 @@ export async function donateToCampaign(campaignPubKey, amount) {
 }
 
 class WithDrawRequest {
-  constructor(properties) {
+  constructor(properties: any) {
     Object.keys(properties).forEach((key) => {
       this[key] = properties[key];
     });
@@ -224,7 +231,7 @@ export async function withdraw(campaignPubKey: any, amount: number) {
   const instructionToOurProgram = new TransactionInstruction({
     keys: [
       { pubkey: campaignPubKey, isSigner: false, isWritable: true },
-      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+      { pubkey: wallet.publicKey!, isSigner: true, isWritable: true },
     ],
     programId: programId,
     data: data_to_send_buffer,
