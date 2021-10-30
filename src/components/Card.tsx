@@ -3,12 +3,14 @@ import { donateToCampaign, getAllCampaigns, withdraw } from "../solana";
 
 const Card = ({ data, setCards }) => {
   const [amount, setAmount] = useState(0);
+
   const onDonate = async (e) => {
     e.preventDefault();
     await donateToCampaign(data.id, amount);
     let newCards = await getAllCampaigns();
     setCards(newCards);
   };
+
   const onWithdraw = async (e) => {
     e.preventDefault();
     try {
@@ -21,6 +23,7 @@ const Card = ({ data, setCards }) => {
     let newCards = await getAllCampaigns();
     setCards(newCards);
   };
+
   return (
     <div>
       <div className="ui card fluid">
@@ -44,7 +47,10 @@ const Card = ({ data, setCards }) => {
                       type="text"
                       name="amount"
                       placeholder="Amount to donate"
-                      onChange={(e) => setAmount(e.target.value)}
+                      onChange={(e) => {
+                        let intValue = parseInt(e.target.value);
+                        setAmount(intValue);
+                      }}
                     />
                   </div>
                 </div>
@@ -70,7 +76,10 @@ const Card = ({ data, setCards }) => {
                       type="text"
                       name="amount"
                       placeholder="Amount to withdraw"
-                      onChange={(e) => setAmount(e.target.value)}
+                      onChange={(e) => {
+                        let intValue = parseInt(e.target.value);
+                        setAmount(intValue);
+                      }}
                     />
                   </div>
                 </div>
