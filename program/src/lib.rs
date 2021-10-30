@@ -126,6 +126,16 @@ fn withdraw(
     let input_data = WithdrawRequest::try_from_slice(&instruction_data)
         .expect("Instruction data serialization did not worked");
 
+    let rent_exemption = Rent::get()?.minimum_balance(writing_account.data_len());
+
+    if **writing_account.lamports.borrow() - rent_exemption < input_data.amount {
+        msg!("Insufficient balance");
+        return Err(ProgramError::InsufficientFunds);
+    }
+
+    **writing_account.try_borrow_mut_lamports()? -= input_data.amount;
+    **admin_account.try_borrow_mut_lamports()? += input_data.amount;
+
     Ok(())
 }
 
