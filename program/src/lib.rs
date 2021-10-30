@@ -9,6 +9,8 @@ use solana_program::{
     sysvar::Sysvar,
 };
 
+use borsh::{BorshDeserialize, BorshSerialize};
+
 fn process_instruction(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -38,6 +40,15 @@ fn process_instruction(
 }
 
 entrypoint!(process_instruction);
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+struct CampaignDetails {
+    pub admin: Pubkey, 
+    pub name: String, 
+    pub description: String, 
+    pub image_link: String, 
+    pub amount_donated: u64,
+}
 
 fn create_campaign(
     program_id: &Pubkey,
