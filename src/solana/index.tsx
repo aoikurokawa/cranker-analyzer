@@ -63,3 +63,63 @@ class CampaignDetails {
     ],
   ]);
 }
+
+async function checkWallet() {
+  if (!wallet.connected) {
+    await wallet.connect();
+  }
+}
+
+export async function createCampaign(name, description, image_link) {
+  await checkWallet();
+
+  const SEED = "abcdef" + Math.random().toString();
+  let newAccout = await PublicKey.createWithSeed(
+    wallet.publicKey,
+    SEED,
+    programId
+  );
+
+  let campaign = new CampaignDetails({
+    name: name,
+    description: description,
+    image_link: image_link,
+    admin: wallet.publicKey.toBuffer(),
+    amount_donated: 0,
+  });
+
+  let data = serialize(CampaignDetails.schema, campaign);
+  let data_to_send = new Uint8Array([0, ...data]);
+
+  const lamports = await connection.getMinimumBalanceForRentExemption(
+    data.length
+  );
+
+  const createProgramAccount = SystemProgram.createAccountWithSeed({
+    fromPubkey: wallet.publicKey,
+    basePubkey: wallet.publicKey,
+    seed: SEED,
+    newAccountPubkey: newAccout,
+    lamports: lamports,
+    space: data.length,
+    programId: programId,
+  });
+
+  const instructionToOurProgram = new TransactionInstruction({
+    keys: [
+      { pubkey: newAccout, isSigner: false, isWritable: true },
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
+    ],
+    programId: programId,
+    data: data_to_send,
+  });
+
+  const trans = await setPayerAndBlockhashTransaction([
+    createProgramAccount,
+    instructionToOurProgram,
+  ]);
+  const signature = await signAndSendTransaction(trans);
+
+  const result = await connection.confirmTransaction(signature);
+  console.log("end sendMessage", result);
+}
