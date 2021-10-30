@@ -6,6 +6,7 @@ import Form from "./components/Form";
 import { getAllCampaigns } from "./solana";
 
 const App = () => {
+  
   const [route, setRoute] = useState(0);
   const [cards, setCards] = useState([]);
 

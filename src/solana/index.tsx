@@ -214,7 +214,7 @@ class WithDrawRequest {
   ]);
 }
 
-export async function withdraw(campaignPubKey, amount) {
+export async function withdraw(campaignPubKey: any, amount: number) {
   await checkWallet();
   let withdrawRequest = new WithDrawRequest({ amount: amount });
   let data = serialize(WithDrawRequest.schema, WithDrawRequest);

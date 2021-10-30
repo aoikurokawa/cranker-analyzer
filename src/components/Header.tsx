@@ -1,8 +1,15 @@
 import React from "react";
-export default ({ setRoute }) => {
+
+const Header = ({ setRoute }) => {
   return (
     <div className="ui menu black" style={{ marginTop: "5px" }}>
-      <a href="/#" className="ui header item" onClick={() => setRoute(0)}>
+      <a
+        href="/#"
+        className="ui header item"
+        onClick={() => {
+          setRoute(0);
+        }}
+      >
         Funding
       </a>
       <a href="/#" className="ui item" onClick={() => setRoute(0)}>
@@ -16,3 +23,5 @@ export default ({ setRoute }) => {
     </div>
   );
 };
+
+export default Header;
