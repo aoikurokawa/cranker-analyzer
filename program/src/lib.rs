@@ -32,6 +32,12 @@ fn process_instruction(
             accounts,
             &instruction_data[1..instruction_data.len()],
         );
+    } else if instruction_data[0] == 2 {
+        return donate(
+            program_id,
+            accounts,
+            &instruction_data[1..instruction_data.len()],
+        );
     }
     msg!("Did not find the entrypoint required");
     Err(ProgramError::InvalidInstructionData)
@@ -144,5 +150,35 @@ fn donate(
     accounts: &[AccountInfo],
     _instruction_data: &[u8],
 ) -> ProgramResult {
+    let accounts_iter = &mut accounts.iter();
+    let writing_account = next_account_info(accounts_iter)?;
+    let donator_program_account = next_account_info(accounts_iter)?;
+    let donator = next_account_info(accounts_iter)?;
+
+    if writing_account.owner != program_id {
+        msg!("writing_account is not owned by program");
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
+    if donator_program_account.owner != program_id {
+        msg!("donator_program_account is not owned by program");
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
+    if !donator.is_signer {
+        msg!("donator should be signer");
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
+    let mut campaign_data = CampaignDetails::try_from_slice(*writing_account.data.borrow())
+        .expect("Error deserializeing data");
+
+    campaign_data.amount_donated += **donator_program_account.lamports.borrow();
+
+    **writing_account.try_borrow_mut_lamports()? += **donator_program_account.lamports.borrow();
+    **donator_program_account.try_borrow_mut_lamports()? = 0;
+
+    campaign_data.serialize(&mut &mut writing_account.data.borrow_mut()[..])?;
+
     Ok(())
 }
