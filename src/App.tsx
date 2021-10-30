@@ -5,10 +5,17 @@ import Card from "./components/Card";
 import Form from "./components/Form";
 import { getAllCampaigns } from "./solana";
 
-const App = () => {
+interface ICard {
+  pubId: string;
+  name: string;
+  description: string;
+  amount_donated: number;
+  image_link: string;
+}
 
+const App = () => {
   const [route, setRoute] = useState(0);
-  const [cards, setCards] = useState([]);
+  const [cards, setCards] = useState<any[]>([]);
 
   useEffect(() => {
     getAllCampaigns().then((val: any) => {
