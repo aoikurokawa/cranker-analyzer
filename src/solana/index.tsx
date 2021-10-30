@@ -123,3 +123,28 @@ export async function createCampaign(name, description, image_link) {
   const result = await connection.confirmTransaction(signature);
   console.log("end sendMessage", result);
 }
+
+export async function getAllCampaigns() {
+  let accounts = await connection.getProgramAccounts(programId);
+  let campaigns = [];
+  accounts.forEach((e) => {
+    try {
+      let campData = deserialize(
+        CampaignDetails.schema,
+        CampaignDetails,
+        e.account.data
+      );
+      campaigns.push({
+        pubId: e.pubkey,
+        name: campData.name,
+        description: campData.description,
+        image_link: campData.image_link,
+        amount_donated: campData.amount_donated,
+        admin: campData.admin,
+      });
+    } catch (err) {
+      console.log(err);
+    }
+  });
+  return campaigns;
+}
