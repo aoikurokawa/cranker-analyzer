@@ -18,6 +18,14 @@ const App = () => {
   const [cards, setCards] = useState<any[]>([]);
 
   useEffect(() => {
+    (Window as any).solana
+      .connect({ onlyIfTrusted: true })
+      .then(({ publicKey }) => {
+        console.log("connected");
+      })
+      .catch((e) => {
+        console.log(e);
+      });
     getAllCampaigns().then((val: any) => {
       setCards(val);
       console.log(val);
