@@ -1,4 +1,4 @@
-use std::{fs, str::FromStr};
+use std::str::FromStr;
 
 use clap::{Parser, Subcommand};
 use dotenv::dotenv;
@@ -9,7 +9,9 @@ use solana_program::{
     pubkey::Pubkey,
 };
 use solana_rpc_client::rpc_client::RpcClient;
-use solana_sdk::{signature::Keypair, signer::Signer, transaction::Transaction};
+use solana_sdk::{
+    signature::Keypair, signer::Signer, system_transaction, transaction::Transaction,
+};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -25,6 +27,9 @@ enum Commands {
 
     /// Counter Program
     Counter { program_id: Pubkey, pkey: Pubkey },
+
+    /// Transfer SOL one account to another
+    Transfer { to: Pubkey },
 }
 
 fn main() {
@@ -49,6 +54,17 @@ fn main() {
 
             ping_program(&rpc_client, &signer, *program_id, pkey);
             println!("Finished successfully");
+        }
+        Commands::Transfer { to } => {
+            let signer = initialize_keypair();
+
+            println!("Public key: {}", signer.pubkey().to_string());
+
+            // airdrop_sol_if_needed(&signer.pubkey(), &rpc_client);
+
+            transfer_sol(&rpc_client, &signer, to);
+
+            println!("send 0.1 SOL");
         }
     }
 }
@@ -79,9 +95,6 @@ fn airdrop_sol_if_needed(signer: &Pubkey, connection: &RpcClient) {
         let airdrop_sig = connection
             .request_airdrop(&signer, LAMPORTS_PER_SOL)
             .expect("request airdrop");
-        let block_hash = connection
-            .get_latest_blockhash()
-            .expect("get latest blockhash");
 
         loop {
             let confirmed = connection
@@ -118,5 +131,20 @@ fn ping_program(
     println!(
         "Transaction https://explorer.solana.com/tx/{}?cluster=devnet",
         transaction_sig
+    );
+}
+
+fn transfer_sol(connection: &RpcClient, from: &Keypair, to: &Pubkey) {
+    let recent_blockhash = connection
+        .get_latest_blockhash()
+        .expect("get latest block hash");
+    let tx = system_transaction::transfer(&from, to, LAMPORTS_PER_SOL / 10, recent_blockhash);
+    let sig = connection
+        .send_and_confirm_transaction(&tx)
+        .expect("send and confirm transaction");
+
+    println!(
+        "Transaction https://explorer.solana.com/tx/{}?cluster=devnet",
+        sig
     );
 }
