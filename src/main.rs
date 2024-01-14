@@ -2,11 +2,13 @@ use std::str::FromStr;
 
 use clap::{Parser, Subcommand};
 use dotenv::dotenv;
+use glass::movie::Movie;
 use solana_program::{
     instruction::{AccountMeta, Instruction},
     message::Message,
     native_token::{lamports_to_sol, LAMPORTS_PER_SOL},
     pubkey::Pubkey,
+    system_program,
 };
 use solana_rpc_client::rpc_client::RpcClient;
 use solana_sdk::{
@@ -30,6 +32,13 @@ enum Commands {
 
     /// Transfer SOL one account to another
     Transfer { to: Pubkey },
+
+    /// Movie review app
+    MovieReview {
+        title: String,
+        rating: u8,
+        description: String,
+    },
 }
 
 fn main() {
@@ -65,6 +74,42 @@ fn main() {
             transfer_sol(&rpc_client, &signer, to);
 
             println!("send 0.1 SOL");
+        }
+        Commands::MovieReview {
+            title,
+            rating,
+            description,
+        } => {
+            let signer = initialize_keypair();
+            let program_id = Pubkey::from_str("CenYq6bDRB7p73EjsPEpiYN7uveyPUTdXkDkgUduboaN")
+                .expect("parse to Pubkey");
+            // let mut buffer = vec![0; 1000];
+            let movie = Movie::new(title.to_string(), *rating, description.to_string());
+
+            let (pda, _bump) = Pubkey::find_program_address(
+                &[&signer.pubkey().to_bytes(), title.as_bytes()],
+                &program_id,
+            );
+            let accounts = vec![
+                AccountMeta::new(signer.pubkey(), true),
+                AccountMeta::new(pda, false),
+                AccountMeta::new(system_program::id(), false),
+            ];
+
+            let instruction = Instruction::new_with_borsh(program_id, &movie, accounts);
+            let message = Message::new(&[instruction], Some(&signer.pubkey()));
+            let recent_blockhash = rpc_client
+                .get_latest_blockhash()
+                .expect("get latest block hash");
+
+            let transaction = Transaction::new(&[&signer], message, recent_blockhash);
+            let transaction_sig = rpc_client
+                .send_and_confirm_transaction(&transaction)
+                .expect("send and confirm transaction");
+            println!(
+                "Transaction https://explorer.solana.com/tx/{}?cluster=devnet",
+                transaction_sig
+            );
         }
     }
 }

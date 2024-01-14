@@ -4,11 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[lib]
-name = "glass"
-crate-type = ["cdylib", "lib"]
 
 [dependencies]
+borsh = "0.10.3"
 clap = { version = "4.4.16", features = ["derive"] }
 dotenv = "0.15.0"
 solana-program = "1.17.15"
