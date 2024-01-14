@@ -2,7 +2,10 @@ use std::{fs, str::FromStr};
 
 use clap::{Parser, Subcommand};
 use dotenv::dotenv;
-use solana_program::{native_token::lamports_to_sol, pubkey::Pubkey};
+use solana_program::{
+    native_token::{lamports_to_sol, LAMPORTS_PER_SOL},
+    pubkey::Pubkey,
+};
 use solana_rpc_client::rpc_client::RpcClient;
 use solana_sdk::{signature::Keypair, signer::Signer};
 
@@ -19,7 +22,7 @@ enum Commands {
     Balance { pkey: String },
 
     /// Counter Program
-    Counter { program_id: String, pkey: String },
+    Counter { program_id: String, pkey: Pubkey },
 }
 
 fn main() {
@@ -39,6 +42,8 @@ fn main() {
             let signer = initialize_keypair();
 
             println!("Public key: {}", signer.pubkey().to_string());
+
+            airdrop_sol_if_needed(&signer.pubkey(), &rpc_client);
             println!("Finished successfully");
         }
     }
@@ -57,5 +62,33 @@ fn initialize_keypair() -> Keypair {
 
             signer
         }
+    }
+}
+
+fn airdrop_sol_if_needed(signer: &Pubkey, connection: &RpcClient) {
+    let balance = connection.get_balance(&signer).expect("get balance");
+    println!("Current balance is {} SOL", balance / LAMPORTS_PER_SOL);
+
+    if balance / LAMPORTS_PER_SOL < 1 {
+        println!("Airdropping 1 SOL");
+
+        let airdrop_sig = connection
+            .request_airdrop(&signer, LAMPORTS_PER_SOL)
+            .expect("request airdrop");
+        let block_hash = connection
+            .get_latest_blockhash()
+            .expect("get latest blockhash");
+
+        loop {
+            let confirmed = connection
+                .confirm_transaction(&airdrop_sig)
+                .expect("confirm transaction");
+            if confirmed {
+                break;
+            }
+        }
+
+        let balance = connection.get_balance(&signer).expect("get balance");
+        println!("New balance is {} SOL", balance / LAMPORTS_PER_SOL);
     }
 }
