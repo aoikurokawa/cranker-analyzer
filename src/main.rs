@@ -39,6 +39,7 @@ fn main() {
             let signer = initialize_keypair();
 
             println!("Public key: {}", signer.pubkey().to_string());
+            println!("Finished successfully");
         }
     }
 }
@@ -46,11 +47,7 @@ fn main() {
 fn initialize_keypair() -> Keypair {
     match std::env::var("PRIVATE_KEY") {
         Ok(private_key) => {
-            println!(
-                "found PRIVATE KEY: {}, the length is {}",
-                private_key,
-                private_key.as_bytes().len()
-            );
+            println!("Generating new keypair...");
             Keypair::from_base58_string(&private_key)
         }
         Err(_) => {
