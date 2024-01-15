@@ -39,6 +39,10 @@ enum Commands {
         rating: u8,
         description: String,
     },
+
+    /// Mint a Token
+    TokenMinter {
+    }
 }
 
 fn main() {
@@ -111,6 +115,7 @@ fn main() {
                 transaction_sig
             );
         }
+        Commands::TokenMinter {  } => {}
     }
 }
 
