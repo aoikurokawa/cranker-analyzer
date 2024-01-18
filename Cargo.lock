@@ -1241,9 +1241,13 @@ dependencies = [
  "borsh 0.10.3",
  "clap",
  "dotenv",
+ "mpl-token-metadata",
  "solana-program",
  "solana-rpc-client",
  "solana-sdk",
+ "spl-associated-token-account",
+ "spl-token",
+ "tokio",
 ]
 
 [[package]]
@@ -1736,6 +1740,19 @@ dependencies = [
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "mpl-token-metadata"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "442bfb6479e149afe1ad5a1440de7b90abbcc7e6647709d89229a3c3fdbe3e12"
+dependencies = [
+ "borsh 0.10.3",
+ "num-derive 0.3.3",
+ "num-traits",
+ "solana-program",
+ "thiserror",
 ]
 
 [[package]]

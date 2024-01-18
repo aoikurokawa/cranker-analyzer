@@ -2,7 +2,8 @@ use std::str::FromStr;
 
 use clap::{Parser, Subcommand};
 use dotenv::dotenv;
-use glass::movie::Movie;
+use glass::{asset::Asset, movie::Movie};
+use mpl_token_metadata::types::TokenStandard;
 use solana_program::{
     instruction::{AccountMeta, Instruction},
     message::Message,
@@ -10,7 +11,7 @@ use solana_program::{
     pubkey::Pubkey,
     system_program,
 };
-use solana_rpc_client::rpc_client::RpcClient;
+use solana_rpc_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     signature::Keypair, signer::Signer, system_transaction, transaction::Transaction,
 };
@@ -41,20 +42,20 @@ enum Commands {
     },
 
     /// Mint a Token
-    TokenMinter {
-    }
+    TokenMinter { name: String, uri: String },
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     dotenv().ok();
     let cli = Cli::parse();
     let url = "https://api.devnet.solana.com";
-    let rpc_client = RpcClient::new(url);
+    let rpc_client = RpcClient::new(url.to_string());
 
     match &cli.command {
         Commands::Balance { pkey } => {
             let pkey = Pubkey::from_str(&pkey).expect("parse to Pubkey");
-            let balance = rpc_client.get_balance(&pkey).expect("get balance");
+            let balance = rpc_client.get_balance(&pkey).await.expect("get balance");
 
             println!("Balance: {}SOL", lamports_to_sol(balance));
         }
@@ -104,18 +105,50 @@ fn main() {
             let message = Message::new(&[instruction], Some(&signer.pubkey()));
             let recent_blockhash = rpc_client
                 .get_latest_blockhash()
+                .await
                 .expect("get latest block hash");
 
             let transaction = Transaction::new(&[&signer], message, recent_blockhash);
             let transaction_sig = rpc_client
                 .send_and_confirm_transaction(&transaction)
+                .await
                 .expect("send and confirm transaction");
             println!(
                 "Transaction https://explorer.solana.com/tx/{}?cluster=devnet",
                 transaction_sig
             );
         }
-        Commands::TokenMinter {  } => {}
+        Commands::TokenMinter { name, uri } => {
+            let mut asset = Asset::default();
+            let token_standard = TokenStandard::NonFungible;
+            let payer = initialize_keypair();
+            let spl_token_program = spl_token::id();
+
+            asset
+                .create(
+                    &rpc_client,
+                    name.to_string(),
+                    uri.to_string(),
+                    token_standard,
+                    &payer,
+                    &payer,
+                    spl_token_program,
+                )
+                .await;
+
+            let token_owner = Keypair::new().pubkey();
+
+            asset
+                .mint(
+                    &rpc_client,
+                    &token_owner,
+                    1,
+                    &payer,
+                    &payer,
+                    spl_token_program,
+                )
+                .await;
+        }
     }
 }
 
@@ -135,8 +168,8 @@ fn initialize_keypair() -> Keypair {
     }
 }
 
-fn airdrop_sol_if_needed(signer: &Pubkey, connection: &RpcClient) {
-    let balance = connection.get_balance(&signer).expect("get balance");
+async fn airdrop_sol_if_needed(signer: &Pubkey, connection: &RpcClient) {
+    let balance = connection.get_balance(&signer).await.expect("get balance");
     println!("Current balance is {} SOL", balance / LAMPORTS_PER_SOL);
 
     if balance / LAMPORTS_PER_SOL < 1 {
@@ -144,23 +177,25 @@ fn airdrop_sol_if_needed(signer: &Pubkey, connection: &RpcClient) {
 
         let airdrop_sig = connection
             .request_airdrop(&signer, LAMPORTS_PER_SOL)
+            .await
             .expect("request airdrop");
 
         loop {
             let confirmed = connection
                 .confirm_transaction(&airdrop_sig)
+                .await
                 .expect("confirm transaction");
             if confirmed {
                 break;
             }
         }
 
-        let balance = connection.get_balance(&signer).expect("get balance");
+        let balance = connection.get_balance(&signer).await.expect("get balance");
         println!("New balance is {} SOL", balance / LAMPORTS_PER_SOL);
     }
 }
 
-fn ping_program(
+async fn ping_program(
     connection: &RpcClient,
     payer: &Keypair,
     program_id: Pubkey,
@@ -171,11 +206,13 @@ fn ping_program(
     let message = Message::new(&[instruction], Some(&payer.pubkey()));
     let recent_blockhash = connection
         .get_latest_blockhash()
+        .await
         .expect("get latest block hash");
 
     let transaction = Transaction::new(&[payer], message, recent_blockhash);
     let transaction_sig = connection
         .send_and_confirm_transaction(&transaction)
+        .await
         .expect("send and confirm transaction");
 
     println!(
@@ -184,13 +221,15 @@ fn ping_program(
     );
 }
 
-fn transfer_sol(connection: &RpcClient, from: &Keypair, to: &Pubkey) {
+async fn transfer_sol(connection: &RpcClient, from: &Keypair, to: &Pubkey) {
     let recent_blockhash = connection
         .get_latest_blockhash()
+        .await
         .expect("get latest block hash");
     let tx = system_transaction::transfer(&from, to, LAMPORTS_PER_SOL / 10, recent_blockhash);
     let sig = connection
         .send_and_confirm_transaction(&tx)
+        .await
         .expect("send and confirm transaction");
 
     println!(
