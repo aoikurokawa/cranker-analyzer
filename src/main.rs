@@ -36,6 +36,7 @@ enum Commands {
 
     /// Movie review app
     MovieReview {
+        program_id: String,
         title: String,
         rating: u8,
         description: String,
@@ -81,14 +82,14 @@ async fn main() {
             println!("send 0.1 SOL");
         }
         Commands::MovieReview {
+            program_id,
             title,
             rating,
             description,
         } => {
             let signer = initialize_keypair();
-            let program_id = Pubkey::from_str("CenYq6bDRB7p73EjsPEpiYN7uveyPUTdXkDkgUduboaN")
-                .expect("parse to Pubkey");
-            // let mut buffer = vec![0; 1000];
+            let program_id = Pubkey::from_str(&program_id).expect("parse to Pubkey");
+
             let movie = Movie::new(title.to_string(), *rating, description.to_string());
 
             let (pda, _bump) = Pubkey::find_program_address(
