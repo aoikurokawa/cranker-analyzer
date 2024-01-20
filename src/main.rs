@@ -64,9 +64,9 @@ async fn main() {
 
             println!("Public key: {}", signer.pubkey().to_string());
 
-            airdrop_sol_if_needed(&signer.pubkey(), &rpc_client);
+            airdrop_sol_if_needed(&signer.pubkey(), &rpc_client).await;
 
-            ping_program(&rpc_client, &signer, *program_id, pkey);
+            ping_program(&rpc_client, &signer, *program_id, pkey).await;
             println!("Finished successfully");
         }
         Commands::Transfer { to } => {
@@ -76,7 +76,7 @@ async fn main() {
 
             // airdrop_sol_if_needed(&signer.pubkey(), &rpc_client);
 
-            transfer_sol(&rpc_client, &signer, to);
+            transfer_sol(&rpc_client, &signer, to).await;
 
             println!("send 0.1 SOL");
         }
