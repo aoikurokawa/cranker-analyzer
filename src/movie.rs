@@ -1,28 +1,21 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use solana_program::pubkey::Pubkey;
 
 #[derive(BorshSerialize, BorshDeserialize)]
-pub struct Movie {
+pub struct Staking {
     varint: u8,
-    title: String,
-    rating: u8,
-    description: String,
+    token: Pubkey,
 }
 
-impl Movie {
-    pub fn new(varint: u8, title: String, rating: u8, description: String) -> Self {
-        Self {
-            varint,
-            title,
-            rating,
-            description,
-        }
+impl Staking {
+    pub fn new(varint: u8, token: Pubkey) -> Self {
+        Self { varint, token }
     }
 }
 
 #[derive(BorshDeserialize)]
-pub struct MovieAccountState {
+pub struct StakingAccountState {
     pub is_initialized: bool,
-    pub rating: u8,
-    pub title: String,
-    pub description: String,
+    pub token: Pubkey,
+    pub insert_date: i64,
 }
