@@ -1,5 +1,4 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use serde::Deserialize;
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct Movie {
@@ -10,9 +9,9 @@ pub struct Movie {
 }
 
 impl Movie {
-    pub fn new(title: String, rating: u8, description: String) -> Self {
+    pub fn new(varint: u8, title: String, rating: u8, description: String) -> Self {
         Self {
-            varint: 0,
+            varint,
             title,
             rating,
             description,

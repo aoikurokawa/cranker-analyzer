@@ -49,6 +49,14 @@ enum Commands {
     /// Get movie review
     GetMovieReview { pubkey: String },
 
+    /// Get movie review
+    UpdateMovieReview {
+        program_id: String,
+        title: String,
+        rating: u8,
+        description: String,
+    },
+
     /// Mint a Token
     TokenMinter { name: String, uri: String },
 }
@@ -97,7 +105,7 @@ async fn main() {
             let signer = initialize_keypair();
             let program_id = Pubkey::from_str(&program_id).expect("parse to Pubkey");
 
-            let movie = Movie::new(title.to_string(), *rating, description.to_string());
+            let movie = Movie::new(0, title.to_string(), *rating, description.to_string());
 
             let (pda, _bump) = Pubkey::find_program_address(
                 &[&signer.pubkey().to_bytes(), title.as_bytes()],
@@ -140,6 +148,43 @@ async fn main() {
             eprintln!("Movie title: {:?}", movie.title);
             eprintln!("Movie description: {:?}", movie.description);
         }
+        Commands::UpdateMovieReview {
+            program_id,
+            title,
+            rating,
+            description,
+        } => {
+            let signer = initialize_keypair();
+            let program_id = Pubkey::from_str(&program_id).expect("parse to Pubkey");
+
+            let movie = Movie::new(1, title.to_string(), *rating, description.to_string());
+
+            let (pda, _bump) = Pubkey::find_program_address(
+                &[&signer.pubkey().to_bytes(), title.as_bytes()],
+                &program_id,
+            );
+            let accounts = vec![
+                AccountMeta::new(signer.pubkey(), true),
+                AccountMeta::new(pda, false),
+            ];
+
+            let instruction = Instruction::new_with_borsh(program_id, &movie, accounts);
+            let message = Message::new(&[instruction], Some(&signer.pubkey()));
+            let recent_blockhash = rpc_client
+                .get_latest_blockhash()
+                .await
+                .expect("get latest block hash");
+
+            let transaction = Transaction::new(&[&signer], message, recent_blockhash);
+            let transaction_sig = rpc_client
+                .send_and_confirm_transaction(&transaction)
+                .await
+                .expect("send and confirm transaction");
+            println!(
+                "Transaction https://explorer.solana.com/tx/{}?cluster=devnet",
+                transaction_sig
+            );
+        }
         Commands::TokenMinter { name, uri } => {
             let mut asset = Asset::default();
             let token_standard = TokenStandard::NonFungible;
@@ -177,10 +222,11 @@ async fn main() {
 fn initialize_keypair() -> Keypair {
     match std::env::var("PRIVATE_KEY") {
         Ok(private_key) => {
-            println!("Generating new keypair...");
+            print!("Found a keypair");
             Keypair::from_base58_string(&private_key)
         }
         Err(_) => {
+            println!("Generating new keypair...");
             let signer = Keypair::new();
             std::fs::write(".env", format!("PRIVATE_KEY={}", signer.to_base58_string()))
                 .expect("write secret key");
