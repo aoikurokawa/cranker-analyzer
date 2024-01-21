@@ -62,6 +62,7 @@ async fn main() {
             );
             let accounts = vec![
                 AccountMeta::new(signer.pubkey(), true),
+                AccountMeta::new(token, false),
                 AccountMeta::new(pda, false),
                 AccountMeta::new(system_program::id(), false),
             ];
@@ -105,7 +106,7 @@ async fn main() {
 fn initialize_keypair() -> Keypair {
     match std::env::var("PRIVATE_KEY") {
         Ok(private_key) => {
-            print!("Found a keypair");
+            println!("Found a keypair");
             Keypair::from_base58_string(&private_key)
         }
         Err(_) => {
