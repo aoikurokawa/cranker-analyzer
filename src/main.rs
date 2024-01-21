@@ -1,8 +1,12 @@
 use std::str::FromStr;
 
+use borsh::BorshDeserialize;
 use clap::{Parser, Subcommand};
 use dotenv::dotenv;
-use glass::{asset::Asset, movie::Movie};
+use glass::{
+    asset::Asset,
+    movie::{Movie, MovieAccountState},
+};
 use mpl_token_metadata::types::TokenStandard;
 use solana_program::{
     instruction::{AccountMeta, Instruction},
@@ -34,13 +38,16 @@ enum Commands {
     /// Transfer SOL one account to another
     Transfer { to: Pubkey },
 
-    /// Movie review app
-    MovieReview {
+    /// Add movie review
+    AddMovieReview {
         program_id: String,
         title: String,
         rating: u8,
         description: String,
     },
+
+    /// Get movie review
+    GetMovieReview { pubkey: String },
 
     /// Mint a Token
     TokenMinter { name: String, uri: String },
@@ -81,7 +88,7 @@ async fn main() {
 
             println!("send 0.1 SOL");
         }
-        Commands::MovieReview {
+        Commands::AddMovieReview {
             program_id,
             title,
             rating,
@@ -118,6 +125,20 @@ async fn main() {
                 "Transaction https://explorer.solana.com/tx/{}?cluster=devnet",
                 transaction_sig
             );
+        }
+        Commands::GetMovieReview { pubkey } => {
+            let pubkey = Pubkey::from_str(pubkey).expect("parse to Pubkey");
+            let account_data = rpc_client
+                .get_account_data(&pubkey)
+                .await
+                .expect("get account");
+
+            let movie = MovieAccountState::deserialize(&mut account_data.as_ref())
+                .expect("deserialize movie");
+            eprintln!("Movie is_initialized: {:?}", movie.is_initialized);
+            eprintln!("Movie rating: {:?}", movie.rating);
+            eprintln!("Movie title: {:?}", movie.title);
+            eprintln!("Movie description: {:?}", movie.description);
         }
         Commands::TokenMinter { name, uri } => {
             let mut asset = Asset::default();

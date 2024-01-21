@@ -1242,6 +1242,7 @@ dependencies = [
  "clap",
  "dotenv",
  "mpl-token-metadata",
+ "serde",
  "solana-program",
  "solana-rpc-client",
  "solana-sdk",
