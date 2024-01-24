@@ -1,15 +1,11 @@
-use std::str::FromStr;
-
-use borsh::BorshDeserialize;
 use clap::{Parser, Subcommand};
 use dotenv::dotenv;
-use glass::stake_info::{StakeInfo, StakeInfoAccountState};
+use glass::{movie, staking};
 use solana_program::{
     instruction::{AccountMeta, Instruction},
     message::Message,
     native_token::LAMPORTS_PER_SOL,
     pubkey::Pubkey,
-    system_program,
 };
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
@@ -39,6 +35,28 @@ enum Commands {
 
     /// Get staking
     GetStaking { pubkey: String },
+
+    /// Add movie review
+    AddMovieReview {
+        program_id: String,
+        title: String,
+        rating: u8,
+        description: String,
+    },
+
+    /// Get movie review
+    GetMovieReview { pubkey: String },
+
+    /// Update movie review
+    UpdateMovieReview {
+        program_id: String,
+        title: String,
+        rating: u8,
+        description: String,
+    },
+
+    /// Initialize Token Mint
+    InitializeTokenMint { program_id: String },
 }
 
 #[tokio::main]
@@ -49,170 +67,46 @@ async fn main() {
     let rpc_client = RpcClient::new(url.to_string());
 
     match &cli.command {
+        // Staking Program
         Commands::InitializeStakeAccount { program_id, token } => {
-            let signer = initialize_keypair();
-            let program_id = Pubkey::from_str(&program_id).expect("parse program_id to Pubkey");
-            let token = Pubkey::from_str(&token).expect("parse token to Pubkey");
-            let staking = StakeInfo::new(0);
-
-            let (pda, _bump) = Pubkey::find_program_address(
-                &[&signer.pubkey().to_bytes(), token.to_bytes().as_ref()],
-                &program_id,
-            );
-            let accounts = vec![
-                AccountMeta::new(signer.pubkey(), true),
-                AccountMeta::new(token, false),
-                AccountMeta::new(pda, false),
-                AccountMeta::new(system_program::id(), false),
-            ];
-
-            let instruction = Instruction::new_with_borsh(program_id, &staking, accounts);
-            let message = Message::new(&[instruction], Some(&signer.pubkey()));
-            let recent_blockhash = rpc_client
-                .get_latest_blockhash()
-                .await
-                .expect("get latest block hash");
-
-            let transaction = Transaction::new(&[&signer], message, recent_blockhash);
-            let transaction_sig = rpc_client
-                .send_and_confirm_transaction(&transaction)
-                .await
-                .expect("send and confirm transaction");
-            println!(
-                "Transaction https://explorer.solana.com/tx/{}?cluster=devnet",
-                transaction_sig
-            );
+            staking::initialize_stake_account(&rpc_client, &program_id, &token).await;
         }
         Commands::Stake { program_id, token } => {
-            let signer = initialize_keypair();
-            let program_id = Pubkey::from_str(&program_id).expect("parse program_id to Pubkey");
-            let token = Pubkey::from_str(&token).expect("parse token to Pubkey");
-            let staking = StakeInfo::new(1);
-
-            let (pda, _bump) = Pubkey::find_program_address(
-                &[&signer.pubkey().to_bytes(), token.to_bytes().as_ref()],
-                &program_id,
-            );
-            let accounts = vec![
-                AccountMeta::new(signer.pubkey(), true),
-                AccountMeta::new(token, false),
-                AccountMeta::new(pda, false),
-            ];
-
-            let instruction = Instruction::new_with_borsh(program_id, &staking, accounts);
-            let message = Message::new(&[instruction], Some(&signer.pubkey()));
-            let recent_blockhash = rpc_client
-                .get_latest_blockhash()
-                .await
-                .expect("get latest block hash");
-
-            let transaction = Transaction::new(&[&signer], message, recent_blockhash);
-            let transaction_sig = rpc_client
-                .send_and_confirm_transaction(&transaction)
-                .await
-                .expect("send and confirm transaction");
-            println!(
-                "Transaction https://explorer.solana.com/tx/{}?cluster=devnet",
-                transaction_sig
-            );
+            staking::stake(&rpc_client, &program_id, &token).await;
         }
         Commands::Redeem { program_id, token } => {
-            let signer = initialize_keypair();
-            let program_id = Pubkey::from_str(&program_id).expect("parse program_id to Pubkey");
-            let token = Pubkey::from_str(&token).expect("parse token to Pubkey");
-            let staking = StakeInfo::new(2);
-
-            let (pda, _bump) = Pubkey::find_program_address(
-                &[&signer.pubkey().to_bytes(), token.to_bytes().as_ref()],
-                &program_id,
-            );
-            let accounts = vec![
-                AccountMeta::new(signer.pubkey(), true),
-                AccountMeta::new(token, false),
-                AccountMeta::new(pda, false),
-            ];
-
-            let instruction = Instruction::new_with_borsh(program_id, &staking, accounts);
-            let message = Message::new(&[instruction], Some(&signer.pubkey()));
-            let recent_blockhash = rpc_client
-                .get_latest_blockhash()
-                .await
-                .expect("get latest block hash");
-
-            let transaction = Transaction::new(&[&signer], message, recent_blockhash);
-            let transaction_sig = rpc_client
-                .send_and_confirm_transaction(&transaction)
-                .await
-                .expect("send and confirm transaction");
-            println!(
-                "Transaction https://explorer.solana.com/tx/{}?cluster=devnet",
-                transaction_sig
-            );
+            staking::redeem(&rpc_client, &program_id, &token).await;
         }
         Commands::Unstake { program_id, token } => {
-            let signer = initialize_keypair();
-            let program_id = Pubkey::from_str(&program_id).expect("parse program_id to Pubkey");
-            let token = Pubkey::from_str(&token).expect("parse token to Pubkey");
-            let staking = StakeInfo::new(3);
-
-            let (pda, _bump) = Pubkey::find_program_address(
-                &[&signer.pubkey().to_bytes(), token.to_bytes().as_ref()],
-                &program_id,
-            );
-            let accounts = vec![
-                AccountMeta::new(signer.pubkey(), true),
-                AccountMeta::new(token, false),
-                AccountMeta::new(pda, false),
-            ];
-
-            let instruction = Instruction::new_with_borsh(program_id, &staking, accounts);
-            let message = Message::new(&[instruction], Some(&signer.pubkey()));
-            let recent_blockhash = rpc_client
-                .get_latest_blockhash()
-                .await
-                .expect("get latest block hash");
-
-            let transaction = Transaction::new(&[&signer], message, recent_blockhash);
-            let transaction_sig = rpc_client
-                .send_and_confirm_transaction(&transaction)
-                .await
-                .expect("send and confirm transaction");
-            println!(
-                "Transaction https://explorer.solana.com/tx/{}?cluster=devnet",
-                transaction_sig
-            );
+            staking::unstake(&rpc_client, &program_id, &token).await;
         }
         Commands::GetStaking { pubkey } => {
-            let pubkey = Pubkey::from_str(pubkey).expect("parse to Pubkey");
-            let account_data = rpc_client
-                .get_account_data(&pubkey)
-                .await
-                .expect("get account");
-
-            let staking = StakeInfoAccountState::deserialize(&mut account_data.as_ref())
-                .expect("deserialize staking");
-
-            eprintln!("Staking is_initialized: {:?}", staking.is_initialized);
-            eprintln!("Staking token: {:?}", staking.token_account);
-            eprintln!("Staking insert_date: {:?}", staking.stake_start_time);
-            eprintln!("Staking stake_redeem: {:?}", staking.last_stake_redeem);
+            staking::get_staking_info(&rpc_client, &pubkey).await;
         }
-    }
-}
 
-fn initialize_keypair() -> Keypair {
-    match std::env::var("PRIVATE_KEY") {
-        Ok(private_key) => {
-            println!("Found a keypair");
-            Keypair::from_base58_string(&private_key)
+        // Movie Review
+        Commands::AddMovieReview {
+            program_id,
+            title,
+            rating,
+            description,
+        } => {
+            movie::add_movie_review(&rpc_client, &program_id, &title, *rating, &description).await;
         }
-        Err(_) => {
-            println!("Generating new keypair...");
-            let signer = Keypair::new();
-            std::fs::write(".env", format!("PRIVATE_KEY={}", signer.to_base58_string()))
-                .expect("write secret key");
-
-            signer
+        Commands::GetMovieReview { pubkey } => {
+            movie::get_movie_review(&rpc_client, &pubkey).await;
+        }
+        Commands::UpdateMovieReview {
+            program_id,
+            title,
+            rating,
+            description,
+        } => {
+            movie::update_movie_review(&rpc_client, &program_id, &title, *rating, &description)
+                .await;
+        }
+        Commands::InitializeTokenMint { program_id } => {
+            movie::initialize_token_mint(&rpc_client, &program_id).await;
         }
     }
 }
