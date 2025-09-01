@@ -139,6 +139,8 @@ enum Commands {
         #[arg(long)]
         max_num_nodes: u64,
     },
+
+    UpdateMerkleRootUploadConfig,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -422,6 +424,36 @@ fn main() -> anyhow::Result<()> {
                     config: config_pda,
                     merkle_root_upload_authority: keypair.pubkey(),
                     tip_distribution_account: tip_distribution_pubkey,
+                }
+                .to_account_metas(None),
+            };
+
+            let blockhash = client.get_latest_blockhash()?;
+            let tx = Transaction::new_signed_with_payer(
+                &[ix],
+                Some(&keypair.pubkey()),
+                &[keypair],
+                blockhash,
+            );
+
+            client.send_transaction(&tx)?;
+        }
+        Commands::UpdateMerkleRootUploadConfig => {
+            let (merkle_root_upload_config_pda, _merkle_root_upload_config_bump) =
+                derive_merkle_root_upload_config_account_address(&program_id);
+
+            let ix = Instruction {
+                program_id,
+                data: jito_tip_distribution::instruction::UpdateMerkleRootUploadConfig {
+                    authority: keypair.pubkey(),
+                    original_authority: keypair.pubkey(),
+                }
+                .data(),
+                accounts: jito_tip_distribution::accounts::UpdateMerkleRootUploadConfig {
+                    config: config_pda,
+                    merkle_root_upload_config: merkle_root_upload_config_pda,
+                    authority: keypair.pubkey(),
+                    system_program: system_program::ID,
                 }
                 .to_account_metas(None),
             };
