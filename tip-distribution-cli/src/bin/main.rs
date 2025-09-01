@@ -175,6 +175,14 @@ enum Commands {
         #[arg(long)]
         claimant: Pubkey,
     },
+
+    CloseTipDistributionAccount {
+        #[arg(long)]
+        vote_account: Pubkey,
+
+        #[arg(long)]
+        epoch: u64,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -551,6 +559,40 @@ fn main() -> anyhow::Result<()> {
                     config: config_pda,
                     claim_status: claim_status_pda,
                     claim_status_payer: keypair.pubkey(),
+                }
+                .to_account_metas(None),
+            };
+
+            let blockhash = client.get_latest_blockhash()?;
+            let tx = Transaction::new_signed_with_payer(
+                &[ix],
+                Some(&keypair.pubkey()),
+                &[keypair],
+                blockhash,
+            );
+
+            client.send_transaction(&tx)?;
+        }
+
+        Commands::CloseTipDistributionAccount {
+            vote_account,
+            epoch,
+        } => {
+            let (tip_distribution_pda, _tip_distribution_bump) =
+                derive_tip_distribution_account_address(&program_id, &vote_account, epoch);
+
+            let ix = Instruction {
+                program_id,
+                data: jito_tip_distribution::instruction::CloseTipDistributionAccount {
+                    _epoch: epoch,
+                }
+                .data(),
+                accounts: jito_tip_distribution::accounts::CloseTipDistributionAccount {
+                    config: config_pda,
+                    expired_funds_account: keypair.pubkey(),
+                    tip_distribution_account: tip_distribution_pda,
+                    validator_vote_account: vote_account,
+                    signer: keypair.pubkey(),
                 }
                 .to_account_metas(None),
             };
