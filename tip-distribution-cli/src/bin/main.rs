@@ -2,7 +2,9 @@ use std::str::FromStr;
 
 use anchor_lang::{system_program, AccountDeserialize, InstructionData, ToAccountMetas};
 use clap::{Parser, Subcommand};
-use jito_tip_distribution::state::{ClaimStatus, Config, TipDistributionAccount};
+use jito_tip_distribution::state::{
+    ClaimStatus, Config, MerkleRootUploadConfig, TipDistributionAccount,
+};
 use jito_tip_distribution_sdk::{
     derive_config_account_address, derive_tip_distribution_account_address,
     instruction::{update_config_ix, UpdateConfigAccounts, UpdateConfigArgs},
@@ -12,6 +14,12 @@ use solana_sdk::{
     instruction::Instruction, pubkey::Pubkey, signature::read_keypair_file, signer::Signer,
     transaction::Transaction,
 };
+
+fn derive_merkle_root_upload_config_account_address(
+    tip_distribution_program_id: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[MerkleRootUploadConfig::SEED], tip_distribution_program_id)
+}
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -70,6 +78,8 @@ enum Commands {
         validator_commission_bps: u16,
     },
 
+    InitializeMerkleRootUploadConfig,
+
     /// Get tip distribution account information for a specific validator and epoch
     GetTipDistributionAccount {
         /// Validator vote account pubkey
@@ -117,9 +127,16 @@ enum Commands {
 
     /// Upload merkle root
     UploadMerkleRoot {
+        #[arg(long)]
         vote_account: Pubkey,
+
+        #[arg(long)]
         root: Vec<u8>,
+
+        #[arg(long)]
         max_total_claim: u64,
+
+        #[arg(long)]
         max_num_nodes: u64,
     },
 }
@@ -211,6 +228,38 @@ fn main() -> anyhow::Result<()> {
                     tip_distribution_account: tip_distribution_pubkey,
                     validator_vote_account: vote_account,
                     signer: keypair.pubkey(),
+                    system_program: system_program::ID,
+                }
+                .to_account_metas(None),
+            };
+
+            let blockhash = client.get_latest_blockhash()?;
+            let tx = Transaction::new_signed_with_payer(
+                &[ix],
+                Some(&keypair.pubkey()),
+                &[keypair],
+                blockhash,
+            );
+
+            client.send_transaction(&tx)?;
+        }
+
+        Commands::InitializeMerkleRootUploadConfig => {
+            let (merkle_root_upload_upload_config_pda, _merkle_root_upload_upload_config_bump) =
+                derive_merkle_root_upload_config_account_address(&program_id);
+
+            let ix = Instruction {
+                program_id,
+                data: jito_tip_distribution::instruction::InitializeMerkleRootUploadConfig {
+                    authority: keypair.pubkey(),
+                    original_authority: keypair.pubkey(),
+                }
+                .data(),
+                accounts: jito_tip_distribution::accounts::InitializeMerkleRootUploadConfig {
+                    config: config_pda,
+                    merkle_root_upload_config: merkle_root_upload_upload_config_pda,
+                    authority: keypair.pubkey(),
+                    payer: keypair.pubkey(),
                     system_program: system_program::ID,
                 }
                 .to_account_metas(None),
