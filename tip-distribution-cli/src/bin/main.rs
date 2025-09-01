@@ -141,6 +141,14 @@ enum Commands {
     },
 
     UpdateMerkleRootUploadConfig,
+
+    MigrateTdaMerkleRootUploadAuthority {
+        #[arg(long)]
+        vote_account: Pubkey,
+
+        #[arg(long)]
+        epoch: u64,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -454,6 +462,37 @@ fn main() -> anyhow::Result<()> {
                     merkle_root_upload_config: merkle_root_upload_config_pda,
                     authority: keypair.pubkey(),
                     system_program: system_program::ID,
+                }
+                .to_account_metas(None),
+            };
+
+            let blockhash = client.get_latest_blockhash()?;
+            let tx = Transaction::new_signed_with_payer(
+                &[ix],
+                Some(&keypair.pubkey()),
+                &[keypair],
+                blockhash,
+            );
+
+            client.send_transaction(&tx)?;
+        }
+
+        Commands::MigrateTdaMerkleRootUploadAuthority {
+            vote_account,
+            epoch,
+        } => {
+            let (tip_distribution_pda, _tip_distribution_bump) =
+                derive_tip_distribution_account_address(&program_id, &vote_account, epoch);
+            let (merkle_root_upload_config_pda, _merkle_root_upload_config_bump) =
+                derive_merkle_root_upload_config_account_address(&program_id);
+
+            let ix = Instruction {
+                program_id,
+                data: jito_tip_distribution::instruction::MigrateTdaMerkleRootUploadAuthority
+                    .data(),
+                accounts: jito_tip_distribution::accounts::MigrateTdaMerkleRootUploadAuthority {
+                    tip_distribution_account: tip_distribution_pda,
+                    merkle_root_upload_config: merkle_root_upload_config_pda,
                 }
                 .to_account_metas(None),
             };
