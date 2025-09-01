@@ -21,6 +21,21 @@ fn derive_merkle_root_upload_config_account_address(
     Pubkey::find_program_address(&[MerkleRootUploadConfig::SEED], tip_distribution_program_id)
 }
 
+fn derive_claim_status_account_address(
+    tip_distribution_program_id: &Pubkey,
+    claimant: &Pubkey,
+    tip_distribution_account: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            ClaimStatus::SEED,
+            claimant.to_bytes().as_ref(),
+            tip_distribution_account.to_bytes().as_ref(),
+        ],
+        tip_distribution_program_id,
+    )
+}
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
@@ -148,6 +163,17 @@ enum Commands {
 
         #[arg(long)]
         epoch: u64,
+    },
+
+    CloseClaimStatus {
+        #[arg(long)]
+        vote_account: Pubkey,
+
+        #[arg(long)]
+        epoch: u64,
+
+        #[arg(long)]
+        claimant: Pubkey,
     },
 }
 
@@ -493,6 +519,38 @@ fn main() -> anyhow::Result<()> {
                 accounts: jito_tip_distribution::accounts::MigrateTdaMerkleRootUploadAuthority {
                     tip_distribution_account: tip_distribution_pda,
                     merkle_root_upload_config: merkle_root_upload_config_pda,
+                }
+                .to_account_metas(None),
+            };
+
+            let blockhash = client.get_latest_blockhash()?;
+            let tx = Transaction::new_signed_with_payer(
+                &[ix],
+                Some(&keypair.pubkey()),
+                &[keypair],
+                blockhash,
+            );
+
+            client.send_transaction(&tx)?;
+        }
+
+        Commands::CloseClaimStatus {
+            vote_account,
+            epoch,
+            claimant,
+        } => {
+            let (tip_distribution_pda, _tip_distribution_bump) =
+                derive_tip_distribution_account_address(&program_id, &vote_account, epoch);
+            let (claim_status_pda, _claim_status_bump) =
+                derive_claim_status_account_address(&program_id, &claimant, &tip_distribution_pda);
+
+            let ix = Instruction {
+                program_id,
+                data: jito_tip_distribution::instruction::CloseClaimStatus.data(),
+                accounts: jito_tip_distribution::accounts::CloseClaimStatus {
+                    config: config_pda,
+                    claim_status: claim_status_pda,
+                    claim_status_payer: keypair.pubkey(),
                 }
                 .to_account_metas(None),
             };
