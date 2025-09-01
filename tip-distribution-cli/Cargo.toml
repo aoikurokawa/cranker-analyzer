@@ -1,0 +1,20 @@
+[package]
+name = "jito-mev-bot"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "jito-mev-bot"
+path = "src/bin/main.rs"
+
+[dependencies]
+anchor-lang = "0.31.1"
+anyhow = "1.0"
+bs58 = "0.5.1"
+clap = { version = "=4.0", features = ["derive"] }
+jito-tip-distribution = { package = "jito-tip-distribution", git = "https://github.com/jito-foundation/jito-programs.git", features = ["no-entrypoint"] }
+jito-tip-distribution-sdk = { package = "jito-tip-distribution-sdk", git = "https://github.com/jito-foundation/jito-programs.git" }
+solana-client = "2.2"
+solana-sdk = "2.2"
