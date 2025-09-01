@@ -183,6 +183,20 @@ enum Commands {
         #[arg(long)]
         epoch: u64,
     },
+
+    Claim {
+        #[arg(long)]
+        vote_account: Pubkey,
+
+        #[arg(long)]
+        epoch: u64,
+
+        #[arg(long)]
+        claimant: Pubkey,
+
+        #[arg(long)]
+        amount: u64,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -593,6 +607,50 @@ fn main() -> anyhow::Result<()> {
                     tip_distribution_account: tip_distribution_pda,
                     validator_vote_account: vote_account,
                     signer: keypair.pubkey(),
+                }
+                .to_account_metas(None),
+            };
+
+            let blockhash = client.get_latest_blockhash()?;
+            let tx = Transaction::new_signed_with_payer(
+                &[ix],
+                Some(&keypair.pubkey()),
+                &[keypair],
+                blockhash,
+            );
+
+            client.send_transaction(&tx)?;
+        }
+
+        Commands::Claim {
+            vote_account,
+            epoch,
+            claimant,
+            amount,
+        } => {
+            let (tip_distribution_pda, _tip_distribution_bump) =
+                derive_tip_distribution_account_address(&program_id, &vote_account, epoch);
+            let (claim_status_pda, claim_status_bump) =
+                derive_claim_status_account_address(&program_id, &claimant, &tip_distribution_pda);
+
+            let proof = vec![];
+
+            let ix = Instruction {
+                program_id,
+                data: jito_tip_distribution::instruction::Claim {
+                    bump: claim_status_bump,
+                    amount,
+                    proof,
+                }
+                .data(),
+                accounts: jito_tip_distribution::accounts::Claim {
+                    config: config_pda,
+                    tip_distribution_account: tip_distribution_pda,
+                    merkle_root_upload_authority: keypair.pubkey(),
+                    claim_status: claim_status_pda,
+                    claimant,
+                    payer: keypair.pubkey(),
+                    system_program: system_program::ID,
                 }
                 .to_account_metas(None),
             };
