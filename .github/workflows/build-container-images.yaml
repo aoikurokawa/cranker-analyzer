@@ -36,12 +36,12 @@ jobs:
         run: |
           case "${{ github.event.inputs.service_config }}" in
             "sample1")
-              echo "target=cranker" >> $GITHUB_OUTPUT
+              echo "target=sample1" >> $GITHUB_OUTPUT
               echo "service=sample1" >> $GITHUB_OUTPUT
               echo "image_name=${{ github.repository }}/sample1" >> $GITHUB_OUTPUT
               ;;
             "sample2")
-              echo "target=api" >> $GITHUB_OUTPUT
+              echo "target=sample2" >> $GITHUB_OUTPUT
               echo "service=sample2" >> $GITHUB_OUTPUT
               echo "image_name=${{ github.repository }}/sample2" >> $GITHUB_OUTPUT
               ;;
