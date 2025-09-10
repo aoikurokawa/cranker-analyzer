@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "meta-merkle-tree",
+    "meta-merkle-tree", "sample1", "sample2",
     "tip-distribution-cli",
 ]
 resolver = "2"
