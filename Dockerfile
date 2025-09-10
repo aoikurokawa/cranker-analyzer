@@ -10,7 +10,7 @@ RUN --mount=type=cache,mode=0777,target=/home/root/app/target \
     --mount=type=cache,mode=0777,target=/usr/local/cargo/registry \
     RUST_BACKTRACE=1 cargo build --release && cp target/release/sample-* ./
 
-FROM debian:bookworm-slim as cranker
+FROM debian:bookworm-slim as sample1
 # Debian 12 (bookworm) uses libssl3 instead of libssl1.1
 RUN apt-get update && apt-get install -y libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
 ENV APP="sample1"
@@ -18,7 +18,7 @@ WORKDIR /app
 COPY --from=builder /home/root/app/${APP} ./
 ENTRYPOINT ./$APP
 
-FROM debian:bookworm-slim as api
+FROM debian:bookworm-slim as sample2
 # Debian 12 (bookworm) uses libssl3 instead of libssl1.1
 RUN apt-get update && apt-get install -y libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
 ENV APP="sample2"
