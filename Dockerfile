@@ -18,7 +18,7 @@ RUN --mount=type=cache,mode=0777,target=/home/root/app/target \
     --mount=type=cache,mode=0777,target=/usr/local/cargo/registry \
     RUST_BACKTRACE=1 cargo build --release  && cp target/release/sample-* ./
 
-FROM  debian:buster-slim as cranker
+FROM  debian:buster-slim as sample1
 # need libssl1.1 for sentry, otherwise get this error:
 # ./kobe-writer-service: error while loading shared libraries: libssl.so.1.1: cannot open shared object file: No such file or directory
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && rm -rf /var/lib/apt/lists/*
@@ -27,7 +27,7 @@ WORKDIR /app
 COPY --from=builder /home/root/app/${APP} ./
 ENTRYPOINT ./$APP
 
-FROM debian:buster-slim as api
+FROM debian:buster-slim as sample2
 # need libssl1.1 for sentry, otherwise get this error:
 # ./kobe-writer-service: error while loading shared libraries: libssl.so.1.1: cannot open shared object file: No such file or directory
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && rm -rf /var/lib/apt/lists/*
