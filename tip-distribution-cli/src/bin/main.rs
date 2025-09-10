@@ -450,10 +450,6 @@ fn main() -> anyhow::Result<()> {
             );
 
             client.send_transaction(&tx)?;
-
-            // let serialized_data = instruction.data;
-            // let base58_data = bs58::encode(serialized_data).into_string();
-            // println!("Base58 Serialized Data: {}", base58_data);
         }
         Commands::UploadMerkleRoot {
             vote_account,
