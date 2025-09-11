@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.4.0
-FROM rust:1.80.0-slim as builder
+FROM rust:1.84.0-slim as builder
 RUN apt-get update && apt-get install -y libudev-dev clang pkg-config libssl-dev build-essential cmake protobuf-compiler
 RUN rustup component add rustfmt
 RUN update-ca-certificates
