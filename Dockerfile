@@ -21,11 +21,11 @@ RUN --mount=type=cache,mode=0777,target=/home/root/app/target \
 FROM debian:bookworm-slim as sample1
 RUN apt-get update && apt-get install -y libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-RUN echo "sample1 stage - check builder output above for actual binary names"
-ENTRYPOINT echo "sample1 debug complete"
+COPY --from=builder /home/root/app/target/release/sample1 ./
+ENTRYPOINT ./sample1
 
 FROM debian:bookworm-slim as sample2
 RUN apt-get update && apt-get install -y libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-RUN echo "sample2 stage - check builder output above for actual binary names"
-ENTRYPOINT echo "sample2 debug complete"
+COPY --from=builder /home/root/app/target/release/sample2 ./
+ENTRYPOINT ./sample2
