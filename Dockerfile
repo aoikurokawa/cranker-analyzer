@@ -6,7 +6,7 @@ RUN update-ca-certificates
 ENV HOME=/home/root
 WORKDIR $HOME/app
 COPY . .
-RUN RUST_BACKTRACE=1 cargo build --release && \
+RUN RUST_BACKTRACE=1 cargo build --release
 
 FROM debian:bookworm-slim as sample1
 RUN apt-get update && apt-get install -y libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
