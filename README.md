@@ -12,6 +12,33 @@ cargo r --bin  jito-tip-distribution-cli -- \
     get-config
 ```
 
+### Initialize Tip Distribution Account
+
+```bash
+cargo r --bin  jito-tip-distribution-cli -- \
+    --rpc-url  https://api.devnet.solana.com \
+    --program-id 3vgVYgJxqFKF2cFYHV4GPBUnLynCJYmKizq9DRmZmTUf \
+    --keypair-path ~/.config/solana/id.json \
+    initialize-tip-distribution-account \
+    --vote-account 8QyvcGJuZ55HjhqwR3uSqsyziww41hDV4osDEGMER2tc \
+    --merkle-root-upload-authority 8QyvcGJuZ55HjhqwR3uSqsyziww41hDV4osDEGMER2tc \
+    --validator-commission-bps 30
+```
+
+### Upload Merkle Root
+
+```bash
+cargo r --bin  jito-tip-distribution-cli -- \
+    --rpc-url  https://api.devnet.solana.com \
+    --program-id 3vgVYgJxqFKF2cFYHV4GPBUnLynCJYmKizq9DRmZmTUf \
+    --keypair-path ~/.config/solana/id.json \
+    upload-merkle-root \
+    --vote-account 8QyvcGJuZ55HjhqwR3uSqsyziww41hDV4osDEGMER2tc \
+    --root '[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]' \
+    --max-total-claim 10 \
+    --max-num-nodes 10
+```
+
 
 
 ## Libraries
