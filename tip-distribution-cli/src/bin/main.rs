@@ -40,14 +40,14 @@ fn derive_claim_status_account_address(
 #[command(author, version, about, long_about = None)]
 struct Cli {
     /// RPC URL for the Solana cluster
-    #[arg(short, long, default_value = "http://localhost:8899")]
+    #[arg(short, long, default_value = "https://api.devnet.solana.com")]
     rpc_url: String,
 
     /// Tip Distribution program ID
     #[arg(
         short,
         long,
-        default_value = "4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7"
+        default_value = "3vgVYgJxqFKF2cFYHV4GPBUnLynCJYmKizq9DRmZmTUf"
     )]
     program_id: String,
 
@@ -146,7 +146,7 @@ enum Commands {
         vote_account: Pubkey,
 
         #[arg(long)]
-        root: Vec<u8>,
+        root: String,
 
         #[arg(long)]
         max_total_claim: u64,
@@ -457,8 +457,25 @@ fn main() -> anyhow::Result<()> {
             max_total_claim,
             max_num_nodes,
         } => {
+            let root_bytes: Vec<u8> = root
+                .split(',')
+                .map(|byte_str| {
+                    byte_str
+                        .trim()
+                        .parse::<u8>()
+                        .map_err(|e| anyhow::anyhow!("Invalid byte '{}': {}", byte_str, e))
+                })
+                .collect::<Result<Vec<u8>, _>>()?;
+
+            if root_bytes.len() != 32 {
+                return Err(anyhow::anyhow!(
+                    "Root must be exactly 32 bytes, got {}",
+                    root_bytes.len()
+                ));
+            }
+
             let mut source: [u8; 32] = [0; 32];
-            source.copy_from_slice(root.as_slice());
+            source.copy_from_slice(&root_bytes);
 
             let epoch = client.get_epoch_info()?.epoch;
             let (tip_distribution_pubkey, _tip_distribution_bump) =

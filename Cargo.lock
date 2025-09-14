@@ -2061,20 +2061,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jito-mev-bot"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "anyhow",
- "bs58",
- "clap",
- "jito-tip-distribution",
- "jito-tip-distribution-sdk",
- "solana-client",
- "solana-sdk",
-]
-
-[[package]]
 name = "jito-programs-vote-state"
 version = "0.1.6"
 source = "git+https://github.com/jito-foundation/jito-programs.git#8f55af0a9b31ac2192415b59ce2c47329ee255a2"
@@ -2122,6 +2108,20 @@ dependencies = [
  "jito-programs-vote-state",
  "solana-program",
  "solana-security-txt",
+]
+
+[[package]]
+name = "jito-tip-distribution-cli"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anyhow",
+ "bs58",
+ "clap",
+ "jito-tip-distribution",
+ "jito-tip-distribution-sdk",
+ "solana-client",
+ "solana-sdk",
 ]
 
 [[package]]
