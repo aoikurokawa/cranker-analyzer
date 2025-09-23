@@ -1,32 +1,6 @@
-[workspace]
-members = [
-    "meta-merkle-tree", "sample1", "sample2",
-    "tip-distribution-cli",
-]
-resolver = "2"
+[package]
+name = "jito-container-monitor"
+version = "0.1.0"
+edition = "2024"
 
-[workspace.dependencies]
-anchor-lang = "0.31.1"
-anyhow = "1.0"
-borsh = { version = "0.10.3" }
-bs58 = "0.5.1"
-bytemuck = { version = "1.16.3", features = ["min_const_generics"] }
-clap = { version = "=4.0", features = ["derive"] }
-fast-math = "0.1"
-hex = "0.4.3"
-jito-bytemuck = { package = "jito-bytemuck", git = "https://github.com/jito-foundation/restaking", branch = "master" }
-jito-jsm-core = { package = "jito-jsm-core", git = "https://github.com/jito-foundation/restaking", branch = "master" }
-jito-restaking-core = { package = "jito-restaking-core", git = "https://github.com/jito-foundation/restaking", branch = "master" }
-jito-restaking-sdk = { package = "jito-restaking-sdk", git = "https://github.com/jito-foundation/restaking", branch = "master" }
-jito-vault-core = { package = "jito-vault-core", git = "https://github.com/jito-foundation/restaking", branch = "master" }
-jito-vault-sdk = { package = "jito-vault-sdk", git = "https://github.com/jito-foundation/restaking", branch = "master" }
-log = "0.4.22"
-meta-merkle-tree = { package = "meta-merkle-tree", git = "https://github.com/jito-foundation/jito-tip-router.git", branch = "master" }
-rand = "0.8.5"
-serde = { version = "^1.0", features = ["derive"] }
-serde_json = "1.0.102"
-solana-program = { version = "2.2.1", default-features = false }
-spl-associated-token-account = { version = "6.0.0", features = ["no-entrypoint"] }
-spl-math = { version = "0.3.0", features = ["no-entrypoint"] }
-spl-token = { version = "7.0.0", features = ["no-entrypoint"] }
-thiserror = "1.0.57"
+[dependencies]
