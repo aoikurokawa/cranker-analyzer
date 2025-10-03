@@ -19,7 +19,7 @@ struct Args {
     #[arg(short, long)]
     address: String,
 
-    /// Number of transactions to fetch (max 1000)
+    /// Number of transactions to fetch (supports pagination for >1000)
     #[arg(short, long, default_value = "100")]
     limit: usize,
 
@@ -56,10 +56,48 @@ async fn main() -> Result<()> {
         RpcClient::new_with_commitment(args.rpc_url.clone(), CommitmentConfig::confirmed());
     let pubkey = Pubkey::from_str(&args.address)?;
 
-    // Fetch signatures
+    // Fetch signatures with pagination
     println!("⏳ Fetching signatures...");
-    let signatures = client.get_signatures_for_address(&pubkey).await?;
-    let limit = std::cmp::min(signatures.len(), args.limit);
+    let mut all_signatures = Vec::new();
+    let mut before_signature = None;
+
+    while all_signatures.len() < args.limit {
+        let batch = if let Some(before) = before_signature {
+            client
+                .get_signatures_for_address_with_config(
+                    &pubkey,
+                    solana_client::rpc_client::GetConfirmedSignaturesForAddress2Config {
+                        before: Some(before),
+                        limit: Some(1000),
+                        ..Default::default()
+                    },
+                )
+                .await?
+        } else {
+            client.get_signatures_for_address(&pubkey).await?
+        };
+
+        if batch.is_empty() {
+            break; // No more signatures
+        }
+
+        before_signature = batch
+            .last()
+            .map(|s| Signature::from_str(&s.signature).unwrap());
+
+        all_signatures.extend(batch);
+
+        if all_signatures.len() >= args.limit {
+            all_signatures.truncate(args.limit);
+            break;
+        }
+
+        if all_signatures.len() > 1000 {
+            println!("  Fetched {} signatures so far...", all_signatures.len());
+        }
+    }
+
+    let limit = all_signatures.len();
     println!("✓ Found {} signatures\n", limit);
 
     // Fetch transactions concurrently in batches
@@ -74,9 +112,8 @@ async fn main() -> Result<()> {
 
     // Process in chunks to avoid overwhelming the RPC
     let chunk_size = args.concurrency;
-    let chunks: Vec<_> = signatures
+    let chunks: Vec<_> = all_signatures
         .iter()
-        .take(limit)
         .collect::<Vec<_>>()
         .chunks(chunk_size)
         .map(|c| c.to_vec())
@@ -97,19 +134,14 @@ async fn main() -> Result<()> {
                         .await
                     {
                         Ok(tx) => {
-                            // match  {
                             let mut program_ids = Vec::new();
                             let mut fee = 0;
 
                             if let Some(meta) = &tx.transaction.meta {
                                 fee = meta.fee;
-
-                                // Extract from UiTransaction
                             }
 
                             if let EncodedTransaction::Json(ui_tx) = tx.transaction.transaction {
-                                // if let Some(ui_tx) = &tx.transaction.transaction {
-                                // if let Some(message) = &ui_tx.message {
                                 // Handle parsed message format
                                 if let solana_transaction_status::UiMessage::Parsed(parsed_msg) =
                                     ui_tx.message
@@ -128,16 +160,12 @@ async fn main() -> Result<()> {
                                             solana_transaction_status::UiInstruction::Compiled(
                                                 compiled_ix,
                                             ) => {
-                                                // if let Ok(idx) =
-                                                //     compiled_ix.program_id_index.parse::<usize>()
-                                                // {
                                                 let idx = compiled_ix.program_id_index as usize;
                                                 if idx < parsed_msg.account_keys.len() {
                                                     program_ids.push(
                                                         parsed_msg.account_keys[idx].pubkey.clone(),
                                                     );
                                                 }
-                                                // }
                                             }
                                         }
                                     }
@@ -153,14 +181,11 @@ async fn main() -> Result<()> {
                                         }
                                     }
                                 }
-                                // }
-                                // }
 
                                 if !program_ids.is_empty() {
                                     return Some((fee, program_ids));
                                 }
                             }
-                            // }
                         }
                         Err(_) => {}
                     }
