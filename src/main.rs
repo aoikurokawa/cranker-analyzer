@@ -162,24 +162,28 @@ async fn main() -> Result<()> {
                                 if let Some(meta) = &tx.transaction.meta {
                                     fee = meta.fee;
                                 }
-
-                                if let EncodedTransaction::Json(ui_tx) = tx.transaction.transaction
-                                {
-                                    if let solana_transaction_status::UiMessage::Parsed(
-                                        parsed_msg,
-                                    ) = ui_tx.message
-                                    {
-                                        for instruction in &parsed_msg.instructions {
-                                            match instruction {
+                                match tx.transaction.transaction {
+                                    EncodedTransaction::Json(ui_tx) => {
+                                        match ui_tx.message {
+                                            solana_transaction_status::UiMessage::Parsed(
+                                                parsed_msg,
+                                            ) => {
+                                                for instruction in &parsed_msg.instructions {
+                                                    match instruction {
                                                 solana_transaction_status::UiInstruction::Parsed(
                                                     parsed_ix,
                                                 ) => {
-                                                    if let UiParsedInstruction::Parsed(parsed_ix) =
-                                                        parsed_ix
+                                                            match parsed_ix {
+                                                    UiParsedInstruction::Parsed(ui_parsed_ix) =>
                                                     {
                                                         program_ids
-                                                            .push(parsed_ix.program_id.clone());
+                                                            .push(ui_parsed_ix.program_id.clone());
                                                     }
+                                                                UiParsedInstruction::PartiallyDecoded(ui_partial_decoded_ix) => {
+                                                        program_ids
+                                                            .push(ui_partial_decoded_ix.program_id.clone());
+                                                                }
+                                                            }
                                                 }
                                                 solana_transaction_status::UiInstruction::Compiled(
                                                     compiled_ix,
@@ -194,25 +198,32 @@ async fn main() -> Result<()> {
                                                     }
                                                 }
                                             }
-                                        }
-                                    } else if let solana_transaction_status::UiMessage::Raw(
-                                        raw_msg,
-                                    ) = ui_tx.message
-                                    {
-                                        for instruction in &raw_msg.instructions {
-                                            let idx = instruction.program_id_index as usize;
-                                            if idx < raw_msg.account_keys.len() {
-                                                program_ids.push(raw_msg.account_keys[idx].clone());
+                                                }
+                                            }
+                                            solana_transaction_status::UiMessage::Raw(raw_msg) => {
+                                                for instruction in &raw_msg.instructions {
+                                                    let idx = instruction.program_id_index as usize;
+                                                    if idx < raw_msg.account_keys.len() {
+                                                        program_ids.push(
+                                                            raw_msg.account_keys[idx].clone(),
+                                                        );
+                                                    }
+                                                }
                                             }
                                         }
-                                    }
 
-                                    if !program_ids.is_empty() {
-                                        return Some((fee, program_ids));
+                                        if !program_ids.is_empty() {
+                                            return Some((fee, program_ids));
+                                        }
+                                    }
+                                    _ => {
+                                        println!("{:?}", tx.transaction.transaction);
                                     }
                                 }
                             }
-                            Err(_) => {}
+                            Err(_) => {
+                                eprintln!("Error");
+                            }
                         }
                     }
                     None
