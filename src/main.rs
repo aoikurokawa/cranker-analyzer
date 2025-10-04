@@ -19,10 +19,6 @@ struct Args {
     #[arg(short, long, value_delimiter = ',')]
     address: Vec<String>,
 
-    /// Number of transactions to fetch (supports pagination for >1000)
-    #[arg(short, long, default_value = "100")]
-    limit: usize,
-
     /// RPC endpoint URL
     #[arg(short, long)]
     rpc_url: String,
@@ -34,32 +30,52 @@ struct Args {
     /// Concurrent requests
     #[arg(short = 'c', long, default_value = "50")]
     concurrency: usize,
+
+    /// Start epoch (inclusive)
+    #[arg(long)]
+    start_epoch: u64,
+
+    /// End epoch (inclusive)
+    #[arg(long)]
+    end_epoch: u64,
 }
 
 #[derive(Debug, Clone)]
 struct ProgramExpense {
     account: String,
+    epoch: u64,
     program_id: String,
     transaction_count: usize,
     total_fees_lamports: u64,
 }
 
+const SLOTS_PER_EPOCH: u64 = 432000;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    let start = Instant::now();
+    let start_time = Instant::now();
 
     println!("🔍 Analyzing {} cranker account(s)", args.address.len());
     for addr in &args.address {
         println!("  - {}", addr);
     }
+
+    let min_slot = args.start_epoch * SLOTS_PER_EPOCH;
+    let max_slot = (args.end_epoch + 1) * SLOTS_PER_EPOCH - 1;
+
+    println!(
+        "📅 Analyzing epochs {} to {}",
+        args.start_epoch, args.end_epoch
+    );
+    println!("📍 Slot range: {} to {}", min_slot, max_slot);
     println!("📡 Using RPC: {}", args.rpc_url);
     println!("⚡ Concurrency: {}\n", args.concurrency);
 
     let client =
         RpcClient::new_with_commitment(args.rpc_url.clone(), CommitmentConfig::confirmed());
 
-    let mut all_program_expenses: HashMap<(String, String), ProgramExpense> = HashMap::new();
+    let mut all_program_expenses: HashMap<(String, u64, String), ProgramExpense> = HashMap::new();
     let mut grand_total_fees = 0u64;
     let mut grand_total_processed = 0usize;
 
@@ -76,128 +92,127 @@ async fn main() -> Result<()> {
 
         let pubkey = Pubkey::from_str(address)?;
 
-        // Fetch signatures with pagination
-        println!("⏳ Fetching signatures...");
-        let mut all_signatures = Vec::new();
-        let mut before_signature = None;
-
-        while all_signatures.len() < args.limit {
-            let batch = if let Some(before) = before_signature {
-                client
-                    .get_signatures_for_address_with_config(
-                        &pubkey,
-                        solana_client::rpc_client::GetConfirmedSignaturesForAddress2Config {
-                            before: Some(before),
-                            limit: Some(1000),
-                            ..Default::default()
-                        },
-                    )
-                    .await?
-            } else {
-                client.get_signatures_for_address(&pubkey).await?
-            };
-
-            if batch.is_empty() {
-                break;
-            }
-
-            before_signature = batch
-                .last()
-                .map(|s| Signature::from_str(&s.signature).unwrap());
-
-            all_signatures.extend(batch);
-
-            if all_signatures.len() >= args.limit {
-                all_signatures.truncate(args.limit);
-                break;
-            }
-
-            if all_signatures.len() > 1000 {
-                println!("  Fetched {} signatures so far...", all_signatures.len());
-            }
-        }
-
-        let limit = all_signatures.len();
-        println!("✓ Found {} signatures\n", limit);
-
-        // Fetch transactions concurrently in batches
-        println!(
-            "📊 Fetching {} transactions with {} concurrent requests...",
-            limit, args.concurrency
-        );
-
-        let mut program_expenses: HashMap<String, ProgramExpense> = HashMap::new();
+        let mut before = None;
+        let mut should_break = false;
+        let mut batch_count = 0;
+        let mut total_fetched = 0;
+        let mut program_expenses: HashMap<(u64, String), ProgramExpense> = HashMap::new();
         let mut total_fees = 0u64;
         let mut processed = 0;
 
-        // Process in chunks to avoid overwhelming the RPC
-        let chunk_size = args.concurrency;
-        let chunks: Vec<_> = all_signatures
-            .iter()
-            .collect::<Vec<_>>()
-            .chunks(chunk_size)
-            .map(|c| c.to_vec())
-            .collect();
+        loop {
+            // Fetch batch of signatures
+            let signatures = client
+                .get_signatures_for_address_with_config(
+                    &pubkey,
+                    solana_client::rpc_client::GetConfirmedSignaturesForAddress2Config {
+                        before,
+                        until: None,
+                        limit: Some(1000),
+                        commitment: Some(CommitmentConfig::confirmed()),
+                    },
+                )
+                .await?;
 
-        for (_chunk_idx, chunk) in chunks.iter().enumerate() {
-            let mut tasks = vec![];
+            if signatures.is_empty() {
+                break;
+            }
 
-            for sig_info in chunk {
-                let client = RpcClient::new_with_commitment(
-                    args.rpc_url.clone(),
-                    CommitmentConfig::confirmed(),
-                );
-                let signature_str = sig_info.signature.clone();
+            batch_count += 1;
+            total_fetched += signatures.len();
 
-                let task = tokio::spawn(async move {
-                    if let Ok(signature) = Signature::from_str(&signature_str) {
-                        match client
-                            .get_transaction(&signature, UiTransactionEncoding::JsonParsed)
-                            .await
-                        {
-                            Ok(tx) => {
-                                let mut program_ids = Vec::new();
-                                let mut fee = 0;
+            // Set before for next iteration
+            before = signatures
+                .last()
+                .map(|s| Signature::from_str(&s.signature).unwrap());
 
-                                if let Some(meta) = &tx.transaction.meta {
-                                    fee = meta.fee;
-                                }
-                                match tx.transaction.transaction {
-                                    EncodedTransaction::Json(ui_tx) => {
+            // Filter signatures by slot range
+            let valid_signatures: Vec<_> = signatures
+                .into_iter()
+                .filter_map(|sig| {
+                    if sig.slot < min_slot {
+                        should_break = true;
+                        None
+                    } else if sig.slot <= max_slot {
+                        Some(sig)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            if valid_signatures.is_empty() {
+                if should_break {
+                    break;
+                }
+                continue;
+            }
+
+            println!(
+                "  Batch {}: {} valid signatures (total fetched: {})",
+                batch_count,
+                valid_signatures.len(),
+                total_fetched
+            );
+
+            // Fetch and process transactions in chunks
+            let chunk_size = args.concurrency;
+            let chunks: Vec<_> = valid_signatures
+                .chunks(chunk_size)
+                .map(|c| c.to_vec())
+                .collect();
+
+            for chunk in chunks {
+                let mut tasks = vec![];
+
+                for sig_info in &chunk {
+                    let client = RpcClient::new_with_commitment(
+                        args.rpc_url.clone(),
+                        CommitmentConfig::confirmed(),
+                    );
+                    let signature_str = sig_info.signature.clone();
+                    let slot = sig_info.slot;
+
+                    let task = tokio::spawn(async move {
+                        if let Ok(signature) = Signature::from_str(&signature_str) {
+                            match client
+                                .get_transaction(&signature, UiTransactionEncoding::JsonParsed)
+                                .await
+                            {
+                                Ok(tx) => {
+                                    let mut program_ids = Vec::new();
+                                    let mut fee = 0;
+
+                                    if let Some(meta) = &tx.transaction.meta {
+                                        fee = meta.fee;
+                                    }
+
+                                    if let EncodedTransaction::Json(ui_tx) =
+                                        tx.transaction.transaction
+                                    {
                                         match ui_tx.message {
                                             solana_transaction_status::UiMessage::Parsed(
                                                 parsed_msg,
                                             ) => {
                                                 for instruction in &parsed_msg.instructions {
                                                     match instruction {
-                                                solana_transaction_status::UiInstruction::Parsed(
-                                                    parsed_ix,
-                                                ) => {
+                                                        solana_transaction_status::UiInstruction::Parsed(parsed_ix) => {
                                                             match parsed_ix {
-                                                    UiParsedInstruction::Parsed(ui_parsed_ix) =>
-                                                    {
-                                                        program_ids
-                                                            .push(ui_parsed_ix.program_id.clone());
-                                                    }
+                                                                UiParsedInstruction::Parsed(ui_parsed_ix) => {
+                                                                    program_ids.push(ui_parsed_ix.program_id.clone());
+                                                                }
                                                                 UiParsedInstruction::PartiallyDecoded(ui_partial_decoded_ix) => {
-                                                        program_ids
-                                                            .push(ui_partial_decoded_ix.program_id.clone());
+                                                                    program_ids.push(ui_partial_decoded_ix.program_id.clone());
                                                                 }
                                                             }
-                                                }
-                                                solana_transaction_status::UiInstruction::Compiled(
-                                                    compiled_ix,
-                                                ) => {
-                                                    let idx = compiled_ix.program_id_index as usize;
-                                                    if idx < parsed_msg.account_keys.len() {
-                                                        program_ids.push(
-                                                            parsed_msg.account_keys[idx]
-                                                                .pubkey
-                                                                .clone(),
-                                                        );
+                                                        }
+                                                        solana_transaction_status::UiInstruction::Compiled(compiled_ix) => {
+                                                            let idx = compiled_ix.program_id_index as usize;
+                                                            if idx < parsed_msg.account_keys.len() {
+                                                                program_ids.push(parsed_msg.account_keys[idx].pubkey.clone());
+                                                            }
+                                                        }
                                                     }
-                                                }
-                                            }
                                                 }
                                             }
                                             solana_transaction_status::UiMessage::Raw(raw_msg) => {
@@ -213,61 +228,62 @@ async fn main() -> Result<()> {
                                         }
 
                                         if !program_ids.is_empty() {
-                                            return Some((fee, program_ids));
+                                            return Some((slot, fee, program_ids));
                                         }
                                     }
-                                    _ => {
-                                        println!("{:?}", tx.transaction.transaction);
-                                    }
                                 }
-                            }
-                            Err(_) => {
-                                eprintln!("Error");
+                                Err(_) => {}
                             }
                         }
-                    }
-                    None
-                });
+                        None
+                    });
 
-                tasks.push(task);
-            }
+                    tasks.push(task);
+                }
 
-            let results = futures::future::join_all(tasks).await;
+                let results = futures::future::join_all(tasks).await;
 
-            for result in results {
-                if let Ok(Some((fee, program_ids))) = result {
-                    total_fees += fee;
-                    processed += 1;
+                for result in results {
+                    if let Ok(Some((slot, fee, program_ids))) = result {
+                        total_fees += fee;
+                        processed += 1;
 
-                    for program_id in program_ids {
-                        program_expenses
-                            .entry(program_id.clone())
-                            .and_modify(|e| {
-                                e.transaction_count += 1;
-                                e.total_fees_lamports += fee;
-                            })
-                            .or_insert(ProgramExpense {
-                                account: address.clone(),
-                                program_id,
-                                transaction_count: 1,
-                                total_fees_lamports: fee,
-                            });
+                        let epoch = slot / SLOTS_PER_EPOCH;
+
+                        for program_id in program_ids {
+                            program_expenses
+                                .entry((epoch, program_id.clone()))
+                                .and_modify(|e| {
+                                    e.transaction_count += 1;
+                                    e.total_fees_lamports += fee;
+                                })
+                                .or_insert(ProgramExpense {
+                                    account: address.clone(),
+                                    epoch,
+                                    program_id,
+                                    transaction_count: 1,
+                                    total_fees_lamports: fee,
+                                });
+                        }
                     }
                 }
             }
 
-            println!(
-                "  Progress: {}/{} transactions ({:.1}%)",
-                processed,
-                limit,
-                (processed as f64 / limit as f64) * 100.0
-            );
+            println!("    Processed {} transactions so far", processed);
+
+            if should_break {
+                break;
+            }
         }
 
         // Add to global expenses
         for (_, expense) in program_expenses {
             all_program_expenses
-                .entry((expense.account.clone(), expense.program_id.clone()))
+                .entry((
+                    expense.account.clone(),
+                    expense.epoch,
+                    expense.program_id.clone(),
+                ))
                 .and_modify(|e| {
                     e.transaction_count += expense.transaction_count;
                     e.total_fees_lamports += expense.total_fees_lamports;
@@ -279,47 +295,63 @@ async fn main() -> Result<()> {
         grand_total_processed += processed;
 
         println!(
-            "✓ Address complete: {} SOL in fees\n",
+            "✓ Address complete: {} transactions, {} SOL in fees\n",
+            processed,
             total_fees as f64 / 1e9
         );
     }
 
-    let duration = start.elapsed();
-    println!("\n✓ Completed in {:.2}s\n", duration.as_secs_f64());
+    let duration = start_time.elapsed();
+    println!("{:-<80}", "");
+    println!(
+        "✓ All addresses completed in {:.2}s",
+        duration.as_secs_f64()
+    );
+    println!(
+        "✓ Total: {} transactions, {:.9} SOL in fees\n",
+        grand_total_processed,
+        grand_total_fees as f64 / 1e9
+    );
 
-    // Sort by total fees descending
+    // Sort by epoch desc, then total fees descending
     let mut expenses: Vec<_> = all_program_expenses.into_iter().map(|(_, v)| v).collect();
-    expenses.sort_by(|a, b| b.total_fees_lamports.cmp(&a.total_fees_lamports));
+    expenses.sort_by(|a, b| {
+        b.epoch
+            .cmp(&a.epoch)
+            .then(b.total_fees_lamports.cmp(&a.total_fees_lamports))
+    });
 
     // Display results
-    println!("{}", "=".repeat(80));
-    println!("📈 EXPENSE BREAKDOWN BY PROGRAM");
-    println!("{}\n", "=".repeat(80));
+    println!("{}", "=".repeat(95));
+    println!("📈 EXPENSE BREAKDOWN BY EPOCH AND PROGRAM");
+    println!("{}\n", "=".repeat(95));
 
     println!(
-        "{:<45} {:>12} {:>15}",
-        "Program ID", "Tx Count", "Total Fees (SOL)"
+        "{:<8} {:<45} {:>12} {:>15}",
+        "Epoch", "Program ID", "Tx Count", "Total Fees (SOL)"
     );
-    println!("{:-<80}", "");
+    println!("{:-<95}", "");
 
     for expense in &expenses {
         let sol_amount = expense.total_fees_lamports as f64 / 1e9;
         println!(
-            "{:<45} {:>12} {:>15.9}",
+            "{:<8} {:<45} {:>12} {:>15.9}",
+            expense.epoch,
             &expense.program_id[..std::cmp::min(44, expense.program_id.len())],
             expense.transaction_count,
             sol_amount
         );
     }
 
-    println!("{:-<80}", "");
+    println!("{:-<95}", "");
     println!(
-        "{:<45} {:>12} {:>15.9}",
+        "{:<8} {:<45} {:>12} {:>15.9}",
         "TOTAL",
+        "",
         grand_total_processed,
         grand_total_fees as f64 / 1e9
     );
-    println!("{}\n", "=".repeat(80));
+    println!("{}\n", "=".repeat(95));
 
     // Export to CSV
     println!("💾 Exporting to CSV: {}", args.output);
@@ -334,14 +366,15 @@ fn export_to_csv(expenses: &[ProgramExpense], filepath: &str) -> Result<()> {
 
     writeln!(
         file,
-        "account,program_id,transaction_count,total_fees_lamports,total_fees_sol"
+        "account,epoch,program_id,transaction_count,total_fees_lamports,total_fees_sol"
     )?;
 
     for expense in expenses {
         writeln!(
             file,
-            "{},{},{},{},{:.9}",
+            "{},{},{},{},{},{:.9}",
             expense.account,
+            expense.epoch,
             expense.program_id,
             expense.transaction_count,
             expense.total_fees_lamports,
